@@ -1,0 +1,84 @@
+"use strict";
+
+const express = require('express');
+const app = express();
+const http = require('http');
+const server = http.createServer(app);
+const { Server } = require("socket.io");
+const io = new Server(server);
+const port = 80;
+
+app.get('/', (req, res) => {
+  res.sendFile(__dirname + '/index.html');
+});
+
+server.listen(port, () => {
+  console.log('signaling server started on port:' + port);
+});
+
+// This callback function is called every time a socket
+// tries to connect to the server
+io.on('connection', function(socket) {
+    // ---- multi room ----
+    socket.on('enter', function(roomname) {
+      socket.join(roomname);
+      console.log('id=' + socket.id + ' enter room=' + roomname);
+      setRoomname(roomname);
+    });
+
+    function setRoomname(room) {
+      socket.roomname = room;
+    }
+
+    function getRoomname() {
+      var room = socket.roomname;
+      return room;
+    }
+
+    function emitMessage(type, message) {
+      // ----- multi room ----
+      var roomname = getRoomname();
+
+      if (roomname) {
+        //console.log('===== message broadcast to room -->' + roomname);
+        socket.broadcast.to(roomname).emit(type, message);
+      }
+      else {
+        console.log('===== message broadcast all');
+        socket.broadcast.emit(type, message);
+      }
+    }
+
+    // When a user send a SDP message
+    // broadcast to all users in the room
+    socket.on('message', function(message) {
+        message.from = socket.id;
+
+        // get send target
+        var target = message.sendto;
+        if (target) {
+          socket.to(target).emit('message', message);
+          return;
+        }
+
+        // broadcast in room
+        emitMessage('message', message);
+    });
+
+    // When the user hangs up
+    // broadcast bye signal to all users in the room
+    socket.on('disconnect', function() {
+        // close user connection
+        console.log((new Date()) + ' Peer disconnected. id=' + socket.id);
+
+        // --- emit ----
+        emitMessage('user disconnected', {id: socket.id});
+
+        // --- leave room --
+        var roomname = getRoomname();
+        if (roomname) {
+          socket.leave(roomname);
+        }
+    });
+
+});

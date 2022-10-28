@@ -1,0 +1,21 @@
+version: "3"
+services:
+  https-portal:
+    image: steveltn/https-portal
+    ports:
+      - '443:443'
+    environment:
+      STAGE: local
+      WEBSOCKET: 'true'
+      DOMAINS: 'video-mtg-sample-20221024.jp -> http://host.docker.internal:8080'
+  app:
+    container_name: video-meeting-sample-app
+    image: node:18.11-alpine3.16
+    tty: true
+    ports:
+      - "8080:80"
+    volumes:
+      - ./src/app:/var/app
+    working_dir: /var/app
+
+
